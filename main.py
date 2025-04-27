@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi.responses import StreamingResponse
 from io import BytesIO
 
-from lib.audio_generator import AudioGenerator
+from lib.audio_generator_old import AudioGenerator
 
 audio_gen = AudioGenerator()
 

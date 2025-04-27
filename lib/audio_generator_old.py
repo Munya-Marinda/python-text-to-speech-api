@@ -1,10 +1,12 @@
-import io
-from gtts import gTTS
-import requests
+import os
 import tempfile
+import time
+from gtts import gTTS
+import playsound  # Cross-platform audio playback
+
 
 class AudioGenerator:
-    """A Text-to-Speech class with streaming support using Google TTS."""
+    """A simple Text-to-Speech class using Google TTS."""
 
     def __init__(self, lang="en", slow=False, timeout=10):
         """
@@ -19,56 +21,76 @@ class AudioGenerator:
         self.slow = slow
         self.timeout = timeout
 
-    def generate_to_stream(self, text):
+    def say(self, text, save_to_file=None):
         """
-        Generate speech and return as in-memory bytes stream.
+        Speak text aloud and optionally save to file.
 
         Args:
             text (str): Text to convert to speech
-
-        Returns:
-            io.BytesIO: Audio data in memory
+            save_to_file (str, optional): Output filename (e.g., 'output.mp3')
         """
         try:
-            # Create in-memory buffer
-            audio_buffer = io.BytesIO()
-            
-            # Generate speech directly to buffer
+            # Generate speech
             tts = gTTS(text=text, lang=self.lang, slow=self.slow)
-            tts.write_to_fp(audio_buffer)
-            
-            # Reset buffer position to start
-            audio_buffer.seek(0)
-            return audio_buffer
 
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"TTS API request failed: {e}")
+            # Save to temp file (or specified file)
+            if save_to_file:
+                output_file = save_to_file
+                tts.save(output_file)
+                print(f"Saved to: {os.path.abspath(output_file)}")
+            else:
+                with tempfile.NamedTemporaryFile(delete=True, suffix=".mp3") as fp:
+                    output_file = fp.name
+                    tts.save(output_file)
+
+                    # Play audio
+                    self._play_audio(output_file)
+
         except Exception as e:
-            raise RuntimeError(f"TTS generation error: {e}")
+            print(f"Error in TTS: {e}")
+            if self._is_internet_connected():
+                print("Retrying...")
+                time.sleep(1)
+                self.say(text, save_to_file)
+            else:
+                print("No internet connection detected.")
 
-    # Keeping the original file-based methods for compatibility
-    def say(self, text, save_to_file=None):
-        """Maintained for backward compatibility."""
-        if save_to_file:
-            self._save_to_file(text, save_to_file)
-        else:
-            audio_buffer = self.generate_to_stream(text)
-            self._play_from_buffer(audio_buffer)
-
-    def _save_to_file(self, text, filename):
-        """Save generated speech to file."""
-        tts = gTTS(text=text, lang=self.lang, slow=self.slow)
-        tts.save(filename)
-
-    def _play_from_buffer(self, audio_buffer):
-        """Play audio from in-memory buffer."""
+    def _play_audio(self, file_path):
+        """Play audio file using playsound (cross-platform)."""
         try:
-            # Create temporary file
-            with tempfile.NamedTemporaryFile(delete=True, suffix=".mp3") as tmp:
-                # Write buffer to temp file
-                tmp.write(audio_buffer.read())
-                tmp.flush()
-                # Play the temp file
-                playsound.playsound(tmp.name, block=True)
+            playsound.playsound(file_path, block=True)
         except Exception as e:
             print(f"Playback error: {e}")
+
+    def _is_internet_connected(self):
+        """Check internet connection (crude method)."""
+        try:
+            import urllib.request
+            urllib.request.urlopen("https://www.google.com", timeout=2)
+            return True
+        except:
+            return False
+
+
+# ===== Example Usage =====
+if __name__ == "__main__":
+    # Initialize with British English
+#     tts = AudioGenerator(lang="en-uk", slow=False)
+
+#     text_to_say = """
+# these are the 
+# types of files
+# that you can
+# export the
+# data as
+#                 """
+
+#     # Speak immediately
+#     tts.say(text_to_say)
+
+#     # Save to file and then play
+#     tts.say(text_to_say, save_to_file="output.mp3")
+
+#     # Non-English example (Spanish)
+#     # tts_es = AudioGenerator(lang="es")
+#     # tts_es.say("Hola desde el traductor de Google")
